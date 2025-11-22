@@ -205,6 +205,14 @@ def get_kl_controller(kl_ctrl):
     elif kl_ctrl.type == "adaptive":
         assert kl_ctrl.horizon > 0, f"horizon must be larger than 0. Got {kl_ctrl.horizon}"
         return AdaptiveKLController(init_kl_coef=kl_ctrl.kl_coef, target_kl=kl_ctrl.target_kl, horizon=kl_ctrl.horizon)
+    elif kl_ctrl.type == "dynamic_beta":
+        from recipe.exploration.dynamic_beta_kl import DynamicBetaKLController
+        return DynamicBetaKLController(
+            beta_min=kl_ctrl.beta_min,
+            beta_max=kl_ctrl.beta_max,
+            eps=getattr(kl_ctrl, "eps", 1e-8),
+            ema_alpha=getattr(kl_ctrl, "ema_alpha", None),
+        )
     else:
         raise NotImplementedError
 
