@@ -152,7 +152,22 @@ def apply_kl_penalty(data: DataProto, kl_ctrl: core_algos.AdaptiveKLController, 
     current_kl = torch.mean(current_kl, dim=0).item()
 
     # according to https://github.com/huggingface/trl/blob/951ca1841f29114b969b57b26c7d3e80a39f75a0/trl/trainer/ppo_trainer.py#L837
-    kl_ctrl.update(current_kl=current_kl, n_steps=batch_size)
+    # kl_ctrl.update(current_kl=current_kl, n_steps=batch_size)
+    # ---- new-changes: dynamic beta schedule support ----
+    if hasattr(kl_ctrl, "update_with_stats"):
+        # scalar pre-KL rewards per rollout
+        scores = token_level_scores.sum(dim=-1)  # (bs,)
+        # prompt-level group ids (same uid => same prompt group)
+        uids = data.non_tensor_batch.get("uid", None)
+        if uids is None:
+            # fallback: treat whole batch as one group
+            uids = list(range(batch_size))
+        elif isinstance(uids, torch.Tensor):
+            uids = uids.cpu().tolist()
+        kl_ctrl.update_with_stats(rewards=scores, uids=uids)
+    else:
+        kl_ctrl.update(current_kl=current_kl, n_steps=batch_size)
+    # ---- end new-changes ----
     data.batch["token_level_rewards"] = token_level_rewards
 
     metrics = {"actor/reward_kl_penalty": current_kl, "actor/reward_kl_penalty_coeff": beta}
